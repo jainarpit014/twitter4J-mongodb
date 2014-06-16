@@ -1,0 +1,75 @@
+import twitter4j.*;
+import twitter4j.conf.*;
+
+import java.net.UnknownHostException;
+import java.util.List;
+import com.mongodb.BasicDBObject;
+import com.mongodb.BulkWriteOperation;
+import com.mongodb.BulkWriteResult;
+import com.mongodb.Cursor;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
+import com.mongodb.MongoClient;
+import com.mongodb.ParallelScanOptions;
+
+
+import java.util.Set;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+public class SearchTweets {
+	
+	private static MongoClient mongoClient;
+	private static DB db;
+	
+    public static void main(String[] args) throws UnknownHostException 
+    {
+    	//connect to mongod;create a instance of database & document
+	    connectMongoDB();
+	    ConfigurationBuilder cb;
+		cb = new ConfigurationBuilder();
+		cb.setDebugEnabled(true);
+		//you can get this credentials from your twitter account after creating a twitter app.
+		cb.setOAuthConsumerKey("XXXXXXX");
+		cb.setOAuthConsumerSecret("XXXXXXX");
+		cb.setOAuthAccessToken("XXXXXXX");
+		cb.setOAuthAccessTokenSecret("XXXXXXX");
+		//create a instance of twitterfactory using above credentials
+	    Twitter twitter = new TwitterFactory(cb.build()).getInstance();
+        try 
+        {
+            Query query = new Query("FIFA");
+            QueryResult result;
+            do {
+                result = twitter.search(query);
+                List<Status> tweets = result.getTweets();
+                for (Status tweet : tweets) {
+                	InsertData("@" + tweet.getUser().getScreenName(),tweet.getText());
+                    //System.out.println("@" + tweet.getUser().getScreenName() + " - " + tweet.getText());
+                }
+            } while ((query = result.nextQuery()) != null);
+            System.exit(0);
+        } catch (TwitterException te) {
+            te.printStackTrace();
+            System.out.println("Failed to search tweets: " + te.getMessage());
+            System.exit(-1);
+        }
+    }
+    private static void InsertData(String user_id,String tweet) throws UnknownHostException
+    {
+    	
+    	DBCollection coll = db.getCollection("tweets");
+    	BasicDBObject doc = new BasicDBObject("user_handle",user_id)
+    	.append("twitter", tweet);
+    	coll.insert(doc);
+    	//System.out.println(coll.getCount());
+    	
+    }
+    private static void connectMongoDB()	throws UnknownHostException
+    {
+    	//connect to localhost(http://127.0.0.1:28017/) mongodb server
+    	mongoClient = new MongoClient( "localhost" );
+    	db = mongoClient.getDB("twitter");
+    }
+}
